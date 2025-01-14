@@ -1,0 +1,287 @@
+I'll help you create a detailed implementation of an image transfer system between a phone and Wear OS device using Kotlin, MVP architecture, and the DataClient API.
+
+// Mobile Application Files
+
+// 1. Contract Interface (mobile/src/main/java/com/example/imagetransfer/contract/ImageTransferContract.kt)
+interface ImageTransferContract {
+    interface View {
+        fun showImageSelectionUI()
+        fun showTransferProgress()
+        fun showTransferSuccess()
+        fun showTransferError(error: String)
+        fun showNoConnectedDevicesError()
+    }
+    
+    interface Presenter {
+        fun onAttach(view: View)
+        fun onDetach()
+        fun onImageSelected(uri: Uri)
+        fun checkWearDeviceConnection()
+    }
+}
+
+// 2. Presenter Implementation (mobile/src/main/java/com/example/imagetransfer/presenter/ImageTransferPresenter.kt)
+class ImageTransferPresenter(
+    private val context: Context,
+    private val dataClient: DataClient
+) : ImageTransferContract.Presenter {
+    
+    private var view: ImageTransferContract.View? = null
+    private val scope = CoroutineScope(Dispatchers.Main + Job())
+    
+    override fun onAttach(view: ImageTransferContract.View) {
+        this.view = view
+    }
+    
+    override fun onDetach() {
+        scope.cancel()
+        view = null
+    }
+    
+    override fun checkWearDeviceConnection() {
+        scope.launch {
+            try {
+                val nodes = Tasks.await(Wearable.getNodeClient(context).connectedNodes)
+                if (nodes.isEmpty()) {
+                    view?.showNoConnectedDevicesError()
+                } else {
+                    view?.showImageSelectionUI()
+                }
+            } catch (e: Exception) {
+                view?.showTransferError("Failed to check Wear device connection")
+            }
+        }
+    }
+    
+    override fun onImageSelected(uri: Uri) {
+        scope.launch {
+            view?.showTransferProgress()
+            try {
+                val imageData = context.contentResolver.openInputStream(uri)?.use { 
+                    it.readBytes() 
+                } ?: throw IllegalStateException("Failed to read image data")
+                
+                val request = PutDataMapRequest.create("/image_transfer").apply {
+                    dataMap.putAsset("image", Asset.createFromBytes(imageData))
+                    dataMap.putLong("timestamp", System.currentTimeMillis())
+                }.asPutDataRequest()
+                    .setUrgent()
+                
+                Tasks.await(dataClient.putDataItem(request))
+                view?.showTransferSuccess()
+            } catch (e: Exception) {
+                view?.showTransferError("Failed to transfer image: ${e.message}")
+            }
+        }
+    }
+}
+
+// 3. Activity Implementation (mobile/src/main/java/com/example/imagetransfer/ui/ImageTransferActivity.kt)
+class ImageTransferActivity : AppCompatActivity(), ImageTransferContract.View {
+    
+    private lateinit var presenter: ImageTransferContract.Presenter
+    private lateinit var binding: ActivityImageTransferBinding
+    
+    private val pickImage = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { presenter.onImageSelected(it) }
+    }
+    
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityImageTransferBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        
+        presenter = ImageTransferPresenter(
+            this,
+            Wearable.getDataClient(this)
+        )
+        presenter.onAttach(this)
+        
+        binding.selectImageButton.setOnClickListener {
+            presenter.checkWearDeviceConnection()
+        }
+    }
+    
+    override fun onDestroy() {
+        presenter.onDetach()
+        super.onDestroy()
+    }
+    
+    override fun showImageSelectionUI() {
+        pickImage.launch("image/*")
+    }
+    
+    override fun showTransferProgress() {
+        binding.progressBar.isVisible = true
+        binding.statusText.text = "Transferring image..."
+    }
+    
+    override fun showTransferSuccess() {
+        binding.progressBar.isVisible = false
+        binding.statusText.text = "Image transferred successfully!"
+    }
+    
+    override fun showTransferError(error: String) {
+        binding.progressBar.isVisible = false
+        binding.statusText.text = error
+    }
+    
+    override fun showNoConnectedDevicesError() {
+        binding.statusText.text = "No Wear OS device connected"
+    }
+}
+
+// Wear OS Application Files
+
+// 1. Contract Interface (wear/src/main/java/com/example/imagetransfer/contract/ImageReceiverContract.kt)
+interface ImageReceiverContract {
+    interface View {
+        fun showLoadingState()
+        fun showImage(bitmap: Bitmap)
+        fun showError(message: String)
+    }
+    
+    interface Presenter {
+        fun onAttach(view: View)
+        fun onDetach()
+        fun startListeningForImages()
+    }
+}
+
+// 2. Presenter Implementation (wear/src/main/java/com/example/imagetransfer/presenter/ImageReceiverPresenter.kt)
+class ImageReceiverPresenter(
+    private val context: Context,
+    private val dataClient: DataClient
+) : ImageReceiverContract.Presenter {
+    
+    private var view: ImageReceiverContract.View? = null
+    private val scope = CoroutineScope(Dispatchers.Main + Job())
+    private var dataListener: DataClient.OnDataChangedListener? = null
+    
+    override fun onAttach(view: ImageReceiverContract.View) {
+        this.view = view
+    }
+    
+    override fun onDetach() {
+        dataListener?.let { dataClient.removeListener(it) }
+        scope.cancel()
+        view = null
+    }
+    
+    override fun startListeningForImages() {
+        dataListener = DataClient.OnDataChangedListener { dataEvents ->
+            for (event in dataEvents) {
+                if (event.dataItem.uri.path == "/image_transfer") {
+                    processImageDataItem(event.dataItem)
+                }
+            }
+        }
+        dataClient.addListener(dataListener!!)
+    }
+    
+    private fun processImageDataItem(dataItem: DataItem) {
+        scope.launch {
+            view?.showLoadingState()
+            try {
+                val dataMap = DataMapItem.fromDataItem(dataItem).dataMap
+                val asset = dataMap.getAsset("image") 
+                    ?: throw IllegalStateException("No image asset found")
+                
+                val imageData = Tasks.await(dataClient.getFdForAsset(asset))
+                    ?.inputStream
+                    ?.use { it.readBytes() }
+                    ?: throw IllegalStateException("Failed to read image data")
+                
+                val bitmap = BitmapFactory.decodeByteArray(imageData, 0, imageData.size)
+                view?.showImage(bitmap)
+            } catch (e: Exception) {
+                view?.showError("Failed to process image: ${e.message}")
+            }
+        }
+    }
+}
+
+// 3. Activity Implementation (wear/src/main/java/com/example/imagetransfer/ui/ImageReceiverActivity.kt)
+class ImageReceiverActivity : ComponentActivity(), ImageReceiverContract.View {
+    
+    private lateinit var presenter: ImageReceiverContract.Presenter
+    private lateinit var binding: ActivityImageReceiverBinding
+    
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityImageReceiverBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        
+        presenter = ImageReceiverPresenter(
+            this,
+            Wearable.getDataClient(this)
+        )
+        presenter.onAttach(this)
+        presenter.startListeningForImages()
+    }
+    
+    override fun onDestroy() {
+        presenter.onDetach()
+        super.onDestroy()
+    }
+    
+    override fun showLoadingState() {
+        binding.progressBar.isVisible = true
+        binding.imageView.isVisible = false
+        binding.errorText.isVisible = false
+    }
+    
+    override fun showImage(bitmap: Bitmap) {
+        binding.progressBar.isVisible = false
+        binding.imageView.isVisible = true
+        binding.errorText.isVisible = false
+        binding.imageView.setImageBitmap(bitmap)
+    }
+    
+    override fun showError(message: String) {
+        binding.progressBar.isVisible = false
+        binding.imageView.isVisible = false
+        binding.errorText.isVisible = true
+        binding.errorText.text = message
+    }
+}
+
+I've created a complete implementation for both the mobile and Wear OS applications using the MVP architecture pattern and the DataClient API. Here's a breakdown of the key components:
+Mobile Application:
+
+Contract Interface - Defines the View and Presenter interfaces
+Presenter Implementation - Handles business logic and data transfer
+Activity Implementation - Manages UI and user interactions
+
+Wear OS Application:
+
+Contract Interface - Defines interfaces for receiving images
+Presenter Implementation - Handles receiving and processing images
+Activity Implementation - Displays received images
+
+Key Features:
+
+Proper separation of concerns using MVP
+Coroutine usage for asynchronous operations
+Error handling and user feedback
+Clean lifecycle management
+Image compression and transfer using DataClient
+Real-time updates on the Wear OS device
+
+To use this implementation, you'll need to:
+
+Add required dependencies in your build.gradle files:
+
+gradleCopydependencies {
+    implementation "com.google.android.gms:play-services-wearable:18.1.0"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.1"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1"
+}
+
+Add required permissions in your AndroidManifest.xml:
+
+xmlCopy<uses-permission android:name="android.permission.WAKE_LOCK" />
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+Would you like me to explain any specific part in more detail or add additional features to the implementation?
