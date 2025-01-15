@@ -352,3 +352,16 @@ Wearable.getCapabilityClient(context)
     .addOnFailureListener { e ->
         Log.e("WearImageReceiver", "Failed to check capability", e)
     }
+
+Wearable.getNodeClient(context)
+    .connectedNodes
+    .addOnSuccessListener { nodes ->
+        if (nodes.isNotEmpty()) {
+            Log.d("Phone", "Wear OS devices connected: ${nodes.map { it.displayName }}")
+        } else {
+            Log.e("Phone", "No Wear OS devices connected")
+        }
+    }
+    .addOnFailureListener { e ->
+        Log.e("Phone", "Failed to retrieve connected nodes", e)
+    }
