@@ -1,0 +1,26 @@
+private val messageListener = MessageClient.OnMessageReceivedListener { messageEvent ->
+        if (messageEvent.path == "/test-path") {
+            val message = String(messageEvent.data)
+            Log.d("Watch", "Message received: $message")
+        } else {
+            Log.d("Watch", "Message received on unknown path: ${messageEvent.path}")
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_wear)
+        Log.d("Watch", "Activity created")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Wearable.getMessageClient(this).addListener(messageListener)
+        Log.d("Watch", "MessageClient listener added")
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Wearable.getMessageClient(this).removeListener(messageListener)
+        Log.d("Watch", "MessageClient listener removed")
+    }
