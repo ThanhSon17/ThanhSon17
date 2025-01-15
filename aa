@@ -365,3 +365,28 @@ Wearable.getNodeClient(context)
     .addOnFailureListener { e ->
         Log.e("Phone", "Failed to retrieve connected nodes", e)
     }
+
+
+Wearable.getCapabilityClient(context)
+    .addLocalCapability("image_transfer_capability")
+    .addOnSuccessListener {
+        Log.d("Wear", "Capability added successfully")
+    }
+    .addOnFailureListener { e ->
+        Log.e("Wear", "Failed to add capability", e)
+    }
+Trên điện thoại (Tìm kiếm capability):
+kotlin
+Copy code
+Wearable.getCapabilityClient(context)
+    .getCapability("image_transfer_capability", CapabilityClient.FILTER_REACHABLE)
+    .addOnSuccessListener { capabilityInfo ->
+        if (capabilityInfo.nodes.isNotEmpty()) {
+            Log.d("Phone", "Connected Wear OS devices: ${capabilityInfo.nodes.map { it.displayName }}")
+        } else {
+            Log.e("Phone", "No reachable Wear OS devices with this capability")
+        }
+    }
+    .addOnFailureListener { e ->
+        Log.e("Phone", "Failed to retrieve capability info", e)
+    }
