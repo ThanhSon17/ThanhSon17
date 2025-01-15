@@ -156,3 +156,33 @@ override fun checkWearDeviceConnection() {
             }
         }
     }
+
+try {
+                // Read image data in IO context
+                val imageData = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { 
+                        it.readBytes() 
+                    } ?: throw IllegalStateException("Failed to read image data")
+                }
+                
+                // Create request on main thread
+                val request = PutDataMapRequest.create("/image_transfer").apply {
+                    dataMap.putAsset("image", Asset.createFromBytes(imageData))
+                    dataMap.putLong("timestamp", System.currentTimeMillis())
+                }.asPutDataRequest()
+                    .setUrgent()
+                
+                // Execute data transfer in IO context
+                withContext(Dispatchers.IO) {
+                    Tasks.await(dataClient.putDataItem(request))
+                }
+                
+                // Update UI on main thread
+                view?.showTransferSuccess()
+                Log.d("ImageTransfer", "Image transfer successful")
+                
+            } catch (e: Exception) {
+                Log.e("ImageTransfer", "Image transfer failed", e)
+                view?.showTransferError("Failed to transfer image: ${e.message}")
+            }
+        }
