@@ -339,3 +339,16 @@ class ImageReceiverActivity : ComponentActivity(), ImageReceiverContract.View {
         binding.errorText.text = message
     }
 }
+
+Wearable.getCapabilityClient(context)
+    .getCapability("wearos_capability", CapabilityClient.FILTER_REACHABLE)
+    .addOnSuccessListener { capabilityInfo ->
+        if (capabilityInfo.nodes.isNotEmpty()) {
+            Log.d("WearImageReceiver", "Wear OS device connected")
+        } else {
+            Log.e("WearImageReceiver", "No connected Wear OS device")
+        }
+    }
+    .addOnFailureListener { e ->
+        Log.e("WearImageReceiver", "Failed to check capability", e)
+    }
