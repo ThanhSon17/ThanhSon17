@@ -92,3 +92,39 @@ view?.showTransferProgress() // Show loading state while checking
                         view?.showNoConnectedDevicesError()
                     }
                 }
+
+
+binding = ActivityImageReceiverBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        
+        capabilityClient = Wearable.getCapabilityClient(this)
+        
+        // Advertise that this device can receive images
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                Tasks.await(capabilityClient.addLocalCapability("receive_images"))
+            } catch (e: Exception) {
+                Log.e("ImageReceiver", "Failed to advertise capability", e)
+            }
+        }
+        
+        presenter = ImageReceiverPresenter(
+            this,
+            Wearable.getDataClient(this)
+        )
+        presenter.onAttach(this)
+        presenter.startListeningForImages()
+    }
+    
+    override fun onDestroy() {
+        // Remove capability when activity is destroyed
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                Tasks.await(capabilityClient.removeLocalCapability("receive_images"))
+            } catch (e: Exception) {
+                Log.e("ImageReceiver", "Failed to remove capability", e)
+            }
+        }
+        presenter.onDetach()
+        super.onDestroy()
+    }
