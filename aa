@@ -128,3 +128,31 @@ binding = ActivityImageReceiverBinding.inflate(layoutInflater)
         presenter.onDetach()
         super.onDestroy()
     }
+
+
+override fun checkWearDeviceConnection() {
+        // Initialize on main thread
+        val nodeClient = Wearable.getNodeClient(context)
+        
+        scope.launch {
+            view?.showTransferProgress()
+            try {
+                // Switch to IO dispatcher for the async operation
+                val nodes = withContext(Dispatchers.IO) {
+                    Tasks.await(nodeClient.connectedNodes)
+                }
+                
+                // Back on main thread
+                if (nodes.isNotEmpty()) {
+                    Log.d("ImageTransfer", "Found connected nodes: ${nodes.map { it.displayName }}")
+                    view?.showImageSelectionUI()
+                } else {
+                    Log.d("ImageTransfer", "No connected nodes found")
+                    view?.showNoConnectedDevicesError()
+                }
+            } catch (e: Exception) {
+                Log.e("ImageTransfer", "Connection check failed", e)
+                view?.showTransferError("Failed to check Wear device connection: ${e.message}")
+            }
+        }
+    }
