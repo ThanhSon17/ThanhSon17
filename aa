@@ -71,3 +71,24 @@ private val messageListener = MessageClient.OnMessageReceivedListener { messageE
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.wear.widget.BoxInsetLayout>
+
+view?.showTransferProgress() // Show loading state while checking
+            try {
+                // Get capabilities to ensure the device can receive images
+                val capabilityInfo = Tasks.await(
+                    Wearable.getCapabilityClient(context)
+                        .getCapability("receive_images", CapabilityClient.FILTER_REACHABLE)
+                )
+                
+                if (capabilityInfo.nodes.isNotEmpty()) {
+                    // We found a wear device that can receive images
+                    view?.showImageSelectionUI()
+                } else {
+                    // Double check connected nodes in case capability isn't registered
+                    val nodes = Tasks.await(Wearable.getNodeClient(context).connectedNodes)
+                    if (nodes.isNotEmpty()) {
+                        view?.showImageSelectionUI()
+                    } else {
+                        view?.showNoConnectedDevicesError()
+                    }
+                }
