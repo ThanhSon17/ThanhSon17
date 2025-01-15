@@ -186,3 +186,156 @@ try {
                 view?.showTransferError("Failed to transfer image: ${e.message}")
             }
         }
+
+
+// Wear OS - ImageReceiverPresenter.kt
+class ImageReceiverPresenter(
+    private val context: Context,
+    private val dataClient: DataClient
+) : ImageReceiverContract.Presenter {
+    
+    private var view: ImageReceiverContract.View? = null
+    private val scope = CoroutineScope(Dispatchers.Main + Job())
+    private var dataListener: DataClient.OnDataChangedListener? = null
+    
+    override fun onAttach(view: ImageReceiverContract.View) {
+        this.view = view
+        Log.d("WearImageReceiver", "Presenter attached to view")
+    }
+    
+    override fun onDetach() {
+        dataListener?.let { dataClient.removeListener(it) }
+        scope.cancel()
+        view = null
+        Log.d("WearImageReceiver", "Presenter detached from view")
+    }
+    
+    override fun startListeningForImages() {
+        Log.d("WearImageReceiver", "Starting to listen for images")
+        
+        // First try to get any existing data
+        scope.launch {
+            try {
+                val dataItems = Tasks.await(dataClient.getDataItems(
+                    Uri.Builder()
+                        .scheme(PutDataRequest.WEAR_URI_SCHEME)
+                        .path("/image_transfer")
+                        .build()
+                ))
+                
+                dataItems.forEach { dataItem ->
+                    Log.d("WearImageReceiver", "Found existing data item")
+                    processImageDataItem(dataItem)
+                }
+            } catch (e: Exception) {
+                Log.e("WearImageReceiver", "Error getting existing data items", e)
+            }
+        }
+        
+        // Then listen for new data
+        dataListener = DataClient.OnDataChangedListener { dataEvents ->
+            Log.d("WearImageReceiver", "Received data change event")
+            for (event in dataEvents) {
+                Log.d("WearImageReceiver", "Processing event: ${event.type} with path: ${event.dataItem.uri.path}")
+                if (event.dataItem.uri.path == "/image_transfer") {
+                    processImageDataItem(event.dataItem)
+                }
+            }
+        }
+        
+        dataClient.addListener(dataListener!!)
+            .addOnSuccessListener { 
+                Log.d("WearImageReceiver", "Successfully added data listener") 
+            }
+            .addOnFailureListener { e ->
+                Log.e("WearImageReceiver", "Failed to add data listener", e)
+            }
+    }
+    
+    private fun processImageDataItem(dataItem: DataItem) {
+        Log.d("WearImageReceiver", "Processing image data item")
+        scope.launch(Dispatchers.Main) {
+            view?.showLoadingState()
+            try {
+                val dataMap = DataMapItem.fromDataItem(dataItem).dataMap
+                val asset = dataMap.getAsset("image") 
+                    ?: throw IllegalStateException("No image asset found")
+                
+                Log.d("WearImageReceiver", "Getting asset FD")
+                
+                // Get the asset on IO thread
+                val imageData = withContext(Dispatchers.IO) {
+                    Tasks.await(dataClient.getFdForAsset(asset))
+                        ?.inputStream
+                        ?.use { it.readBytes() }
+                        ?: throw IllegalStateException("Failed to read image data")
+                }
+                
+                Log.d("WearImageReceiver", "Decoding bitmap")
+                
+                // Decode bitmap on IO thread
+                val bitmap = withContext(Dispatchers.IO) {
+                    BitmapFactory.decodeByteArray(imageData, 0, imageData.size)
+                }
+                
+                Log.d("WearImageReceiver", "Showing image")
+                view?.showImage(bitmap)
+                
+            } catch (e: Exception) {
+                Log.e("WearImageReceiver", "Failed to process image", e)
+                view?.showError("Failed to process image: ${e.message}")
+            }
+        }
+    }
+}
+
+// Wear OS - ImageReceiverActivity.kt
+class ImageReceiverActivity : ComponentActivity(), ImageReceiverContract.View {
+    
+    private lateinit var presenter: ImageReceiverContract.Presenter
+    private lateinit var binding: ActivityImageReceiverBinding
+    
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        Log.d("WearImageReceiver", "Activity onCreate")
+        
+        binding = ActivityImageReceiverBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        
+        presenter = ImageReceiverPresenter(
+            this,
+            Wearable.getDataClient(this)
+        )
+        
+        presenter.onAttach(this)
+        presenter.startListeningForImages()
+    }
+    
+    override fun onDestroy() {
+        presenter.onDetach()
+        super.onDestroy()
+    }
+    
+    override fun showLoadingState() {
+        Log.d("WearImageReceiver", "Showing loading state")
+        binding.progressBar.isVisible = true
+        binding.imageView.isVisible = false
+        binding.errorText.isVisible = false
+    }
+    
+    override fun showImage(bitmap: Bitmap) {
+        Log.d("WearImageReceiver", "Showing image")
+        binding.progressBar.isVisible = false
+        binding.imageView.isVisible = true
+        binding.errorText.isVisible = false
+        binding.imageView.setImageBitmap(bitmap)
+    }
+    
+    override fun showError(message: String) {
+        Log.d("WearImageReceiver", "Showing error: $message")
+        binding.progressBar.isVisible = false
+        binding.imageView.isVisible = false
+        binding.errorText.isVisible = true
+        binding.errorText.text = message
+    }
+}
