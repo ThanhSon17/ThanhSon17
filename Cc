@@ -49,3 +49,63 @@ private lateinit var imageView: ImageView
         }
     }
 }
+
+
+val pickImageLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                val selectedImageUri: Uri? = result.data?.data
+                selectedImageUri?.let {
+                    imageView.setImageURI(it)
+
+                    // Get the real path and title of the image
+                    val realPath = getRealPathFromURI(it)
+                    val title = getFileNameFromURI(it)
+
+                    // Add image details to the path list
+                    val pathItem = PathItem(
+                        id = it.lastPathSegment ?: "unknown_id",
+                        mUrl = realPath ?: "unknown_path",
+                        mTitle = title ?: "unknown_title",
+                        mimeType = contentResolver.getType(it) ?: "unknown"
+                    )
+                    pathList.add(pathItem)
+                }
+            }
+        }
+
+        // Set button click listener to open gallery
+        pickImageButton.setOnClickListener {
+            val intent = Intent(Intent.ACTION_PICK).apply {
+                type = "image/*"
+            }
+            pickImageLauncher.launch(intent)
+        }
+    }
+
+    // Helper function to get real file path from URI
+    private fun getRealPathFromURI(uri: Uri): String? {
+        var path: String? = null
+        val projection = arrayOf(MediaStore.Images.Media.DATA)
+        val cursor: Cursor? = contentResolver.query(uri, projection, null, null, null)
+        cursor?.use {
+            if (it.moveToFirst()) {
+                val columnIndex = it.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
+                path = it.getString(columnIndex)
+            }
+        }
+        return path
+    }
+
+    // Helper function to get file name from URI
+    private fun getFileNameFromURI(uri: Uri): String? {
+        var name: String? = null
+        val projection = arrayOf(MediaStore.Images.Media.DISPLAY_NAME)
+        val cursor: Cursor? = contentResolver.query(uri, projection, null, null, null)
+        cursor?.use {
+            if (it.moveToFirst()) {
+                val columnIndex = it.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+                name = it.getString(columnIndex)
+            }
+        }
+        return name
+    }
