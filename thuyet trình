@@ -35,3 +35,14 @@ dependencies {
 Viết Unit Test Cơ Bản
 
 Giả sử ta có class Calculator:
+
+Mockito
+
+Mockito giúp bạn tạo và xác định hành vi của các đối tượng giả, mô phỏng các phụ thuộc và tương tác. Điều này giúp dễ dàng cô lập và kiểm tra các đơn vị mã riêng lẻ. Mockito cũng có khả năng khẳng định mạnh mẽ để kiểm tra các lệnh gọi phương thức và giá trị tham số.
+JUnit5
+
+Unit5 là phiên bản mới nhất của khung kiểm thử JUnit và đã giới thiệu những cải tiến đáng kể so với các phiên bản trước. Nó cung cấp một kiến ​​trúc mô-đun, cho phép bạn chỉ sử dụng các thành phần có liên quan đến nhu cầu kiểm thử của mình. Với thư viện khẳng định mạnh mẽ và hỗ trợ cho các bài kiểm thử tham số, JUnit5 cung cấp một nền tảng vững chắc để viết toàn diện và hiệu quả.
+
+Khung thử nghiệm ưa thích của chúng tôi là Mockito, vì vậy đây sẽ là cơ sở cho bài viết này vì nó dễ triển khai và sử dụng trong Kotlin với Android Studio.
+
+Hãy kiểm tra cách thêm Mockitothư viện vào Gradletệp dưới thẻ phụ thuộc.
