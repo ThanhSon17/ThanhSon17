@@ -66,6 +66,199 @@ whenever(mockCallService.addContact(any()))
 .thenReturn(Contact(1L, “john.doe@mail.com”, “315 194 6020”))
 verify() – hàm này được sử dụng để kiểm tra xem một hàm có được gọi trên một đối tượng giả với các đối số chính xác hay không.
 
+
+
+How to use Mockito in Kotlin
+Now that we’re aware of what Mockito is, let’s look at how to apply it to a Kotlin project. 
+
+You must add the dependency listed below to the build.gradle file if you wish to use the Mockito framework in your project.
+
+testImplementation ("org.mockito.kotlin:mockito-kotlin:$latest_version")
+The Maven Central website contains the $latest_version of the Mockito framework. 
+
+After completing the necessary setup, let’s examine a real-world situation in which a straightforward code base is tested using the Mockito framework.
+
+First, as you can see, we have a simple data class called User that serves as a data holder of  some basic information about the user.
+
+data class User(
+   val id: Long,
+   val name: String,
+   val email: String
+)
+The UserRepository interface serves as a “bridge” to connect the data layer with the user service’s business logic.
+
+interface UserRepository {
+   fun findById(id: Long): User?
+   fun save(user: User): User
+   fun deleteById(id: Long)
+Finally, we have a basic UserService class with our business logic.
+
+class UserService(private val userRepository: UserRepository) {
+   fun getUser(id: Long): User? {
+       return userRepository.findById(id)
+   }
+   fun saveUser(user: User): User {
+       return userRepository.save(user)
+   }
+   fun deleteUser(id: Long) {
+       userRepository.deleteById(id)
+   }
+}
+The first step in testing our business logic class UserService would be to create an appropriate class which will be called UserServiceTest and it will hold the test cases.
+
+In test cases we use the real instance of the class under test, not a mocked one. But all the required classes on which our class under test depends are being mocked.
+
+To be able to test the appropriate functionality we need to have an instance of the UserService class so we can call the desired functions and test their behavior. 
+
+So we need to create a mock instance of the UserRepository as shown below. When the mocked object is created it can be used to create the required instance of the UserService class.
+
+private val userRepositoryMock: UserRepository = mock()
+private val userService = UserService(userRepositoryMock)
+Here’s a simple diagram to explain the matter further.
+
+image 21
+Source: vogella
+
+As you can see the getUser function is used to retrieve a User, so let’s check if it works as expected. 
+
+We’ll start by setting up the desired behavior of our mock using the whenever function. 
+
+As you can see we use the any function which in this place is a placeholder for a Long value type passed to the findById function. 
+
+At the end we call the thenReturn function which returns a mocked USER. After we create the desired behavior we just need to call the getUser function from the UserService class and check that the returned User is equal to the expected value using assertEquals.
+
+@Test
+   fun `assert that the expected user is being returned`() {
+       whenever(userRepositoryMock.findById(any())).thenReturn(USER)
+       val user = userService.getUser(1L)
+       assertEquals(USER, user)
+   }
+The other test case for the getUser function would be to check if it works as expected when an invalid userId is provided for example. In that case, the returned value should be null.
+
+The mock behavior stays the same as in the previous test case. We just need to return a null value using the thenReturn function rather than a User value. 
+
+When we call the getUser function from the UserService class we pass an invalid user id. Now we just need to check if the returned value is equal to null using assertNull.
+
+  @Test
+   fun `assert that null is returned for invalid user id`() {
+       whenever(userRepositoryMock.findById(any())).thenReturn(null)
+       val user = userService.getUser(-101L)
+       assertNull(user)
+   }
+A test case for the saveUser function could be the same as the first test case which covers the getUser functionality where we check if the returned value of the User is the expected one.
+
+Just in this case, we’d check if the saved User is the same as the returned one.
+
+I have never seen a piece of code that couldn’t be improved by adding a few tests.
+
+Kent Beck, software engineer
+When it comes to checking if some functionality is called using the right argument, or if it is called the correct number of times we can use the verify function.
+
+The first test case below shows how to check if a function was called using the correct provided argument, and the second test case shows how to check if a function was called the correct number of times, using the times function.
+
+   @Test
+   fun `verify deleteById was called with the correct argument`() {
+       userService.deleteUser(USER_ID)
+       verify(userRepositoryMock).deleteById(USER_ID)
+   }
+@Test
+   fun `verify deleteById was called only once`() {
+       userService.deleteUser(USER_ID)
+       verify(userRepositoryMock, times(1)).deleteById(USER_ID)
+   }
+All of these examples should equip you well on your way to use Mockito with Kotlin.
+
+
+Đầu tiên, như bạn thấy, chúng ta có một lớp dữ liệu đơn giản có tên là User đóng vai trò là nơi lưu trữ dữ liệu một số thông tin cơ bản về người dùng.
+
+lớp dữ liệu Người dùng (  
+   id hợp lệ : Dài ,
+   val name: String ,
+   val email: Chuỗi
+)
+Giao diện UserRepository đóng vai trò như một “cầu nối” để kết nối lớp dữ liệu với logic kinh doanh của dịch vụ người dùng.
+
+giao diện UserRepository {
+   vui vẻ findById ( id: Long ) : Người dùng? 
+   vui vẻ lưu ( người dùng: Người dùng ) : Người dùng 
+   vui vẻ deleteById ( id: Long ) 
+Cuối cùng, chúng ta có lớp UserService cơ bản với logic nghiệp vụ của mình.
+
+lớp UserService ( giá trị riêng tư userRepository: UserRepository ) {   
+   fun getUser ( id: Long ) : Người dùng? { 
+       trả về userRepository.findById ( id )
+   }
+   vui vẻ saveUser ( người dùng: Người dùng ) : Người dùng { 
+       trả về userRepository. lưu ( người dùng )
+   }
+   vui vẻ deleteUser ( id: Long ) {  
+       userRepository. deleteById ( id )
+   }
+}
+Bước đầu tiên trong việc kiểm tra lớp logic kinh doanh UserService của chúng ta là tạo một lớp thích hợp có tên là UserServiceTest và lớp này sẽ chứa các trường hợp kiểm tra.
+
+Trong các trường hợp thử nghiệm, chúng tôi sử dụng phiên bản thực của lớp đang thử nghiệm, không phải phiên bản giả mạo. Nhưng tất cả các lớp bắt buộc mà lớp đang thử nghiệm của chúng tôi phụ thuộc vào đều đang được giả mạo.
+
+Để có thể kiểm tra chức năng phù hợp, chúng ta cần có một phiên bản của lớp UserService để có thể gọi các hàm mong muốn và kiểm tra hành vi của chúng. 
+
+Vì vậy, chúng ta cần tạo một phiên bản giả của UserRepository như được hiển thị bên dưới. Khi đối tượng giả được tạo, nó có thể được sử dụng để tạo phiên bản bắt buộc của lớp UserService.
+
+val riêng tư userRepositoryMock: UserRepository = mock () 
+val riêng tư userService = UserService ( userRepositoryMock ) 
+Sau đây là sơ đồ đơn giản để giải thích rõ hơn vấn đề này.
+
+hình ảnh 21
+Nguồn: vogella
+
+Như bạn có thể thấy, hàm getUser được sử dụng để lấy Người dùng, vậy hãy kiểm tra xem nó có hoạt động như mong đợi không. 
+
+Chúng ta sẽ bắt đầu bằng cách thiết lập hành vi mong muốn của bản mô phỏng bằng cách sử dụng hàm whenever. 
+
+Như bạn có thể thấy, chúng ta sử dụng hàm any, ở đây là hàm giữ chỗ cho kiểu giá trị Long được truyền cho hàm findById. 
+
+Cuối cùng, chúng ta gọi hàm thenReturn trả về một USER đã mô phỏng. Sau khi tạo hành vi mong muốn, chúng ta chỉ cần gọi hàm getUser từ lớp UserService và kiểm tra xem User trả về có bằng giá trị mong đợi hay không bằng assertEquals .
+
+@Bài kiểm tra
+   fun `khẳng định rằng người dùng mong đợi đang được trả về` () { 
+       bất cứ khi nào ( userRepositoryMock.findById ( any ()) ) . thenReturn ( USER )
+       val người dùng = userService.getUser ( 1L )
+       assertEquals ( NGƯỜI DÙNG, người dùng )
+   }
+Trường hợp thử nghiệm khác cho hàm getUser sẽ là kiểm tra xem nó có hoạt động như mong đợi khi cung cấp userId không hợp lệ hay không. Trong trường hợp đó, giá trị trả về phải là null.
+
+Hành vi giả vẫn giống như trong trường hợp thử nghiệm trước. Chúng ta chỉ cần trả về giá trị null bằng hàm thenReturn thay vì giá trị User. 
+
+Khi chúng ta gọi hàm getUser từ lớp UserService, chúng ta truyền một ID người dùng không hợp lệ. Bây giờ chúng ta chỉ cần kiểm tra xem giá trị trả về có bằng null hay không bằng cách sử dụng assertNull .
+
+  @Bài kiểm tra
+   fun `khẳng định rằng null được trả về cho id người dùng không hợp lệ` () { 
+       bất cứ khi nào ( userRepositoryMock. findById ( any ())) . thenReturn ( null )
+       val user = userService.getUser ( -101L )
+       assertNull ( người dùng )
+   }
+Trường hợp thử nghiệm cho hàm saveUser có thể giống với trường hợp thử nghiệm đầu tiên bao gồm chức năng getUser, trong đó chúng ta kiểm tra xem giá trị trả về của User có phải là giá trị mong đợi hay không.
+
+Trong trường hợp này, chúng ta sẽ kiểm tra xem Người dùng đã lưu có giống với Người dùng được trả về hay không.
+
+Tôi chưa bao giờ thấy một đoạn mã nào không thể được cải thiện bằng cách thêm một vài bài kiểm tra.
+
+Kent Beck, kỹ sư phần mềm
+Khi cần kiểm tra xem một chức năng nào đó có được gọi bằng đúng đối số hay không hoặc có được gọi đúng số lần hay không, chúng ta có thể sử dụng hàm verify .
+
+Trường hợp kiểm tra đầu tiên bên dưới cho thấy cách kiểm tra xem một hàm có được gọi hay không bằng cách sử dụng đúng đối số được cung cấp và trường hợp kiểm tra thứ hai cho thấy cách kiểm tra xem một hàm có được gọi đúng số lần hay không bằng cách sử dụng hàm times .
+
+   @Bài kiểm tra
+   fun `verify deleteById đã được gọi với đối số chính xác` () { 
+       userService.xóaNgườiDùng ( USER_ID )​
+       xác minh ( userRepositoryMock ) . deleteById ( USER_ID )
+   }
+@Bài kiểm tra
+   fun `verify deleteById chỉ được gọi một lần` () { 
+       userService.xóaNgườiDùng ( USER_ID )​
+       xác minh ( userRepositoryMock, lần ( 1 )) . deleteById ( USER_ID )
+   }
+Tất cả những ví dụ này sẽ giúp bạn hiểu rõ hơn về cách sử dụng Mockito với Kotlin.
+
 mockCallService.callNumber(“315 194 6020”)
 verify(mockCallService).callNumber(“315 194 6020”)
 doAnswer() – hàm này được sử dụng để xác định hành vi tùy chỉnh cho đối tượng giả, nó có thể được sử dụng để thực thi mã tùy chỉnh khi một hàm được gọi trên đối tượng giả.
