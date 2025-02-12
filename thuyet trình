@@ -46,3 +46,31 @@ Unit5 là phiên bản mới nhất của khung kiểm thử JUnit và đã gi�
 Khung thử nghiệm ưa thích của chúng tôi là Mockito, vì vậy đây sẽ là cơ sở cho bài viết này vì nó dễ triển khai và sử dụng trong Kotlin với Android Studio.
 
 Hãy kiểm tra cách thêm Mockitothư viện vào Gradletệp dưới thẻ phụ thuộc.
+
+Sau đây là một số phương pháp phổ biến nhất trong khuôn khổ Mockito:
+
+mock() – tạo một đối tượng giả dựa trên lớp hoặc giao diện mà bạn truyền vào làm đối số.
+
+val mockCallService = mock<CallService>()
+or
+val mockCallService : CallService = mock()
+whenever() – thiết lập hành vi của một đối tượng giả. Nó được sử dụng để chỉ định giá trị trả về của một hàm hoặc để ném ngoại lệ khi một hàm được gọi.
+
+thenReturn() – hàm này được sử dụng để chỉ định giá trị trả về của một hàm trong một đối tượng giả.
+
+whenever(mockCallService.isContactAvailable())
+.thenReturn(true)
+any() – hàm này được sử dụng như một trình giữ chỗ cho bất kỳ giá trị nào của một kiểu nhất định, nó thay thế giá trị cụ thể của đối số hàm.
+
+whenever(mockCallService.addContact(any()))
+.thenReturn(Contact(1L, “john.doe@mail.com”, “315 194 6020”))
+verify() – hàm này được sử dụng để kiểm tra xem một hàm có được gọi trên một đối tượng giả với các đối số chính xác hay không.
+
+mockCallService.callNumber(“315 194 6020”)
+verify(mockCallService).callNumber(“315 194 6020”)
+doAnswer() – hàm này được sử dụng để xác định hành vi tùy chỉnh cho đối tượng giả, nó có thể được sử dụng để thực thi mã tùy chỉnh khi một hàm được gọi trên đối tượng giả.
+
+doAnswer { invocation ->
+   val phoneNumber = (invocation.arguments[0] as? String)!!
+   phoneNumber.removePrefix(SOME_PREFIX)
+}.whenever(mockCallService).stripPrefixFromPhoneNumber(any())
