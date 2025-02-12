@@ -1,0 +1,37 @@
+Bài Thuyết Trình: Unit Test trong Kotlin
+
+1. Giới Thiệu Về Unit Test
+
+Unit Test là gì?
+
+Unit Test là quá trình kiểm thử từng đơn vị nhỏ nhất trong mã nguồn (hàm, lớp, module) để đảm bảo tính đúng đắn của nó.
+
+Trong Kotlin, Unit Test thường được viết bằng JUnit 5 và KotlinTest.
+
+Tại sao cần Unit Test?
+
+Phát hiện lỗi sớm trong quá trình phát triển.
+
+Giúp code dễ hiểu và dễ bảo trì hơn.
+
+Tăng tính đảm bảo chất lượng phần mềm.
+
+2. Cách Viết Unit Test Trong Kotlin
+
+Cấu trúc thư mục
+
+src/main/kotlin - Chứa code chính.
+
+src/test/kotlin - Chứa code test.
+
+Cài đặt JUnit 5 và Mockito (Gradle)
+
+dependencies {
+    testImplementation("org.junit.jupiter:junit-jupiter:5.9.2")
+    testImplementation("org.mockito:mockito-core:4.3.1")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:4.0.0")
+}
+
+Viết Unit Test Cơ Bản
+
+Giả sử ta có class Calculator:
