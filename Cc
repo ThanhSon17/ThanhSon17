@@ -109,3 +109,22 @@ val pickImageLauncher = registerForActivityResult(ActivityResultContracts.StartA
         }
         return name
     }
+
+
+
+1. AI Trợ Lý Ảo với ChatGPT hoặc LLMs
+Bạn có thể tích hợp một mô hình AI như GPT-4 hoặc Gemini để giúp trợ lý ảo có thể trả lời câu hỏi tự nhiên.
+Dùng API của OpenAI hoặc một mô hình LLM chạy cục bộ để tránh độ trễ khi giao tiếp.
+2. Tích Hợp với Nhà Thông Minh (Smart Home)
+Sử dụng các nền tảng như Home Assistant, Google Home, hoặc Apple HomeKit để kết nối và điều khiển thiết bị trong nhà.
+Dùng giao thức Matter hoặc MQTT để kết nối với nhiều thiết bị khác nhau.
+3. Nhân Vật Ảo 3D Di Chuyển trong Không Gian
+Sử dụng Unity hoặc Unreal Engine để tạo nhân vật 3D xuất hiện trong thế giới thực tế ảo.
+Công nghệ AI NPC (Non-Player Character) của NVIDIA ACE hoặc Inworld AI có thể giúp nhân vật này có phản ứng tự nhiên hơn.
+Dùng Inverse Kinematics (IK) và Animation AI để nhân vật có thể di chuyển linh hoạt.
+4. Tích Hợp trên Meta Quest
+Meta Quest 3 hỗ trợ WebXR, OpenXR, nên có thể phát triển ứng dụng thực tế ảo bằng Unity hoặc WebXR.
+Nếu muốn chạy offline, bạn cần biên dịch mô hình AI xuống thiết bị (ví dụ: chạy mô hình Llama 3 trên nền tảng Android của Quest).
+5. Điều Khiển bằng Giọng Nói và Cử Chỉ
+Sử dụng Meta Voice SDK hoặc OpenAI Whisper để nhận diện giọng nói.
+Kết hợp với công nghệ Hand Tracking và Eye Tracking trên Quest để giúp người dùng tương tác với trợ lý dễ hơn.
