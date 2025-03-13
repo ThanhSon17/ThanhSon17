@@ -128,3 +128,43 @@ Nếu muốn chạy offline, bạn cần biên dịch mô hình AI xuống thi�
 5. Điều Khiển bằng Giọng Nói và Cử Chỉ
 Sử dụng Meta Voice SDK hoặc OpenAI Whisper để nhận diện giọng nói.
 Kết hợp với công nghệ Hand Tracking và Eye Tracking trên Quest để giúp người dùng tương tác với trợ lý dễ hơn.
+
+Kính Meta Quest 3 có thể trở thành một công cụ hỗ trợ mạnh mẽ cho người khiếm thị bằng cách sử dụng AI, Computer Vision (thị giác máy tính) và công nghệ âm thanh không gian để:
+
+Nhận diện môi trường xung quanh: Xác định vật thể, chướng ngại vật, con người và biển báo trong thời gian thực.
+Đọc văn bản & biển hiệu: Sử dụng OCR (Optical Character Recognition) để đọc sách, menu, bảng chỉ dẫn, tài liệu, v.v.
+Mô tả cảnh vật & hướng dẫn đường đi: Cung cấp mô tả bằng giọng nói AI, hướng dẫn người dùng di chuyển an toàn.
+Nhận diện người & đồ vật quen thuộc: Nhắc nhở khi gặp người quen hoặc đồ vật thường dùng (chìa khóa, điện thoại...).
+Hỗ trợ AI tương tác bằng giọng nói: Người dùng có thể đặt câu hỏi, tìm địa điểm gần nhất hoặc yêu cầu trợ giúp bằng lệnh thoại.
+Công nghệ cần sử dụng
+1. Computer Vision (Thị giác máy tính)
+✔ YOLO (You Only Look Once), OpenCV, TensorFlow, Mediapipe – Nhận diện vật thể, biển báo giao thông, khuôn mặt người.
+✔ Depth Sensors (Cảm biến chiều sâu của Meta Quest 3) – Đánh giá khoảng cách để tránh va chạm.
+
+2. AI & Xử lý ngôn ngữ tự nhiên (NLP)
+✔ Whisper (OpenAI), Google Speech-to-Text – Nhận diện giọng nói để người khiếm thị ra lệnh bằng giọng.
+✔ ChatGPT, Gemini AI, GPT-4 – Xử lý ngôn ngữ, đưa ra phản hồi thông minh bằng giọng nói.
+
+3. OCR (Nhận diện chữ viết)
+✔ Tesseract OCR, Google Cloud Vision API – Đọc văn bản trên biển hiệu, tài liệu, sách, hóa đơn.
+
+4. Hệ thống âm thanh định hướng & cảnh báo thông minh
+✔ Spatial Audio (Âm thanh không gian của Meta Quest 3) – Tạo âm thanh hướng dẫn phát ra từ phía vật thể để giúp định hướng tốt hơn.
+✔ Bone Conduction Headphones (Tai nghe truyền âm qua xương) – Cho phép nghe thông báo mà không cần che tai, giúp giữ an toàn khi đi đường.
+
+5. Điều hướng & GPS
+✔ Google Maps API, OpenStreetMap, ARKit/ARCore – Hướng dẫn đường đi theo thời gian thực.
+✔ SLAM (Simultaneous Localization and Mapping) – Công nghệ điều hướng trong nhà, giúp người dùng di chuyển trong siêu thị, bến xe, trung tâm thương mại.
+
+Cách hoạt động của hệ thống
+1️⃣ Nhận diện môi trường: Camera & AI phân tích cảnh vật.
+2️⃣ Cảnh báo chướng ngại vật: Hệ thống âm thanh thông báo "Phía trước có xe đạp, cách 2 mét".
+3️⃣ Đọc biển báo & hướng dẫn đường đi: Nếu thấy biển hiệu "Lối ra", AI đọc lên: "Lối ra ở phía trước, đi thẳng 5 mét rồi rẽ trái".
+4️⃣ Trả lời câu hỏi của người dùng: Người dùng hỏi: "Nhà vệ sinh ở đâu?", AI tìm trên bản đồ và hướng dẫn.
+5️⃣ Đọc sách, thực đơn, tài liệu: Người dùng hướng kính vào tờ giấy và ra lệnh "Đọc nội dung này", hệ thống sẽ quét & đọc to.
+
+Ứng dụng thực tế
+✅ Hỗ trợ người khiếm thị đi lại an toàn trong thành phố
+✅ Giúp đọc văn bản, sách, tài liệu mà không cần trợ giúp từ người khác
+✅ Xác định được người thân, bạn bè hoặc đồ vật cá nhân
+✅ Hướng dẫn di chuyển trong nhà ga, sân bay, trung tâm thương mại
