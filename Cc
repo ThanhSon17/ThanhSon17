@@ -1,4 +1,4 @@
-<LinearLayout
+8<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -168,3 +168,94 @@ Cách hoạt động của hệ thống
 ✅ Giúp đọc văn bản, sách, tài liệu mà không cần trợ giúp từ người khác
 ✅ Xác định được người thân, bạn bè hoặc đồ vật cá nhân
 ✅ Hướng dẫn di chuyển trong nhà ga, sân bay, trung tâm thương mại
+
+class GalleryLocalAlbum(context: Context) {
+    private val mResolver: ContentResolver = context.contentResolver
+
+    fun getSharedAlbums(tempAlbums: LinkedHashMap<String?, AlbumData>) {
+        Log.i(TAG, "Query for shared album")
+
+        val spaceProjection = arrayOf(
+            MdeSpaceTable.COLUMN.SPACE_ID,
+            MdeSpaceTable.COLUMN.TITLE,
+            MdeSpaceTable.COLUMN.MODIFIED_TIME,
+            MdeSpaceTable.COLUMN.MEDIA_COUNT,
+            MdeSpaceTable.COLUMN.IS_OWNED_BY_ME,
+            FAMILY_SHARED
+        )
+
+        querySharedAlbums(spaceProjection, tempAlbums)
+        querySharedAlbumThumbnails(tempAlbums)
+    }
+
+    private fun querySharedAlbums(spaceProjection: Array<String>, tempAlbums: LinkedHashMap<String?, AlbumData>) {
+        val orderBy = "${MdeSpaceTable.COLUMN.ALBUM_TYPE}, UPPER(${MdeSpaceTable.COLUMN.TITLE})"
+        try {
+            mResolver.query(MdeSpaceTable.CONTENT_URI, spaceProjection, null, null, orderBy)?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    val id = constructId(cursor.getString(cursor.getColumnIndexOrThrow(MdeSpaceTable.COLUMN.SPACE_ID)))
+                    if (cursor.getInt(cursor.getColumnIndexOrThrow(MdeSpaceTable.COLUMN.MEDIA_COUNT)) > 0) {
+                        tempAlbums[id] = AlbumData(
+                            id = id,
+                            title = cursor.getString(cursor.getColumnIndexOrThrow(MdeSpaceTable.COLUMN.TITLE)),
+                            count = cursor.getInt(cursor.getColumnIndexOrThrow(MdeSpaceTable.COLUMN.MEDIA_COUNT)),
+                            isShared = true,
+                            isSharedAlbumOwner = cursor.getInt(cursor.getColumnIndexOrThrow(MdeSpaceTable.COLUMN.IS_OWNED_BY_ME)) == 1,
+                            updated = cursor.getLong(cursor.getColumnIndexOrThrow(MdeSpaceTable.COLUMN.MODIFIED_TIME)),
+                            isFamilyAlbum = cursor.getInt(cursor.getColumnIndexOrThrow(MdeSpaceTable.COLUMN.ALBUM_TYPE)) == MdeSpaceTable.FAMILY_ALBUM
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error querying shared albums: ${e.message}", e)
+        }
+    }
+
+    private fun querySharedAlbumThumbnails(tempAlbums: LinkedHashMap<String?, AlbumData>) {
+        val sharedItemProjection = arrayOf(
+            MdeItemTable.COLUMN.SPACE_ID,
+            MdeItemTable.COLUMN.THUMBNAIL_LOCAL_PATH
+        )
+
+        try {
+            mResolver.query(MdeItemTable.CONTENT_URI, sharedItemProjection, null, null, null)?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    val id = constructId(cursor.getString(cursor.getColumnIndexOrThrow(MdeItemTable.COLUMN.SPACE_ID)))
+                    tempAlbums[id]?.let { data ->
+                        if (data.thumbnailUrl == null) {
+                            data.thumbnailUrl = cursor.getString(cursor.getColumnIndexOrThrow(MdeItemTable.COLUMN.THUMBNAIL_LOCAL_PATH))
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error querying thumbnails: ${e.message}", e)
+        }
+    }
+
+    fun findSharedAlbums(): Collection<AlbumData> {
+        val foundSharedAlbums = LinkedHashMap<String?, AlbumData>()
+        getSharedAlbums(foundSharedAlbums)
+        Log.i(TAG, "Found shared albums: ${foundSharedAlbums.size} items.")
+        return foundSharedAlbums.values
+    }
+
+    companion object {
+        private const val TAG = "GallerySharedAlbum"
+        const val FAMILY_SHARED = "CASE WHEN ${MdeSpaceTable.COLUMN.GROUP_ID} LIKE 'SAFM%' THEN ${MdeSpaceTable.FAMILY_ALBUM_TYPE} ELSE ${MdeSpaceTable.OTHER_ALBUM_TYPE} END ${MdeSpaceTable.COLUMN.ALBUM_TYPE}"
+        const val BUCKET_ID_PREFIX = "SAGallerySharedAlbum"
+        fun constructId(spaceID: String): String = "$BUCKET_ID_PREFIX:$spaceID"
+    }
+}
+
+data class AlbumData(
+    val id: String,
+    val title: String,
+    val count: Int,
+    val isShared: Boolean,
+    val isSharedAlbumOwner: Boolean,
+    val updated: Long,
+    val isFamilyAlbum: Boolean,
+    var thumbnailUrl: String? = null
+)
