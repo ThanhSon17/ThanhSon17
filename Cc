@@ -259,3 +259,204 @@ data class AlbumData(
     val isFamilyAlbum: Boolean,
     var thumbnailUrl: String? = null
 )
+
+class GalleryLocalAlbum(private val mContext: Context) {
+    private val mResolver: ContentResolver = mContext.contentResolver
+    private val mediaDBVersion: Int = getMediaDBVersionCode(mContext)
+
+    private fun getMediaDBVersionCode(context: Context): Int = try {
+        context.packageManager.getPackageInfo("com.android.providers.media", 0).longVersionCode.toInt()
+    } catch (e: PackageManager.NameNotFoundException) {
+        Log.i(TAG, "Couldn't get the versionCode for com.android.providers.media")
+        -1
+    }
+
+    fun findAlbums(): Collection<AlbumData> {
+        Log.i(TAG, "Finding albums")
+        val foundAlbums = LinkedHashMap<String, AlbumData>()
+        findAlbums(foundAlbums)
+        Log.i(TAG, "Found ${foundAlbums.size} items.")
+        return foundAlbums.values
+    }
+
+    private fun findAlbums(foundAlbums: LinkedHashMap<String, AlbumData>) {
+        val tempAlbums = LinkedHashMap<String, AlbumData>()
+        val uri = if (GalleryAppFeatures.USE_SEC_MEDIA_URI) AUTHORITY_URI else MediaItemColumns.EXTERNAL_CONTENT_URI
+
+        try {
+            addNormalAlbums(uri, tempAlbums)
+            addFavoriteAlbums(uri, tempAlbums)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        sortAlbumsGraceOrder(foundAlbums, tempAlbums)
+    }
+
+    private fun getDataColumnName(): String =
+        if (GalleryAppFeatures.isSupportCloudOnlySync()) "IFNULL(_data, cloud_thumb_path) as _data" else "_data"
+
+    private fun addNormalAlbums(uri: Uri, tempAlbums: LinkedHashMap<String, AlbumData>) {
+        val projection = arrayOf(
+            getDataColumnName(),
+            MediaItemColumns.BUCKET_ID,
+            MediaItemColumns.BUCKET_DISPLAY_NAME,
+            MediaItemColumns.DATE_TAKEN,
+            MediaItemColumns.ID_,
+            "count(${MediaItemColumns.ID_})",
+            "max(coalesce(${MediaItemColumns.DATE_MODIFIED}, ${MediaItemColumns.DATE_ADDED}))"
+        )
+
+        val bundle = Bundle().apply {
+            apply {
+                if (GalleryAppFeatures.USE_SEC_MEDIA_URI && !GalleryAppFeatures.isSupportCloudOnlySync()) {
+                    putString(ContentResolver.QUERY_ARG_SQL_SELECTION, "is_cloud != 2")
+                }
+                putString(ContentResolver.QUERY_ARG_SQL_GROUP_BY, MediaItemColumns.BUCKET_ID)
+                putString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER, "UPPER(${MediaItemColumns.BUCKET_DISPLAY_NAME})")
+            }
+        }
+
+        mResolver.query(uri, projection, bundle, null)?.use { cursor ->
+            Log.i(TAG, "addNormalAlbums: cursor ${cursor.count}")
+            val indices = getColumnIndices(cursor)
+            with(cursor) {
+                while (moveToNext()) {
+                    val bucketId = getString(indices.bucketIdIndex) ?: continue
+                    val id = constructId(bucketId)
+                    if (tempAlbums.containsKey(id)) continue
+
+                    val data = AlbumData()
+                    data.id = id
+                    if (indices.dataIndex >= 0) {
+                        data.thumbnailUrl = getString(indices.dataIndex)
+                    }
+
+                    val nameAlbum: String? = GalleryAppFeatures.getTitleAlbum(data.thumbnailUrl)
+                    if (indices.nameIndex >= 0) {
+                        data.title = getString(indices.nameIndex)
+                    }
+                    if (data.title == null) {
+                        data.title = nameAlbum
+                    }
+
+                    if (indices.idIndex >= 0) {
+                        data.thumbnailId = getLong(indices.idIndex)
+                    }
+
+                    val normalCount = if (indices.countIndex >= 0) getInt(indices.countIndex) else 1
+                    data.count = normalCount
+
+                    if (indices.dateTakenIndex >= 0) {
+                        val updated = getLong(indices.dateTakenIndex)
+                        data.updated = if (data.updated == 0L) updated else minOf(data.updated, updated)
+                    } else {
+                        data.count++
+                    }
+
+                    tempAlbums[id] = data
+                }
+            }
+        }
+    }
+
+    private fun addFavoriteAlbums(uri: Uri, tempAlbums: LinkedHashMap<String, AlbumData>) {
+        if (GalleryAppFeatures.isSamsungDevice() && mediaDBVersion >= 809) {
+            val projection = arrayOf(
+                getDataColumnName(),
+                MediaItemColumns.DATE_TAKEN,
+                MediaItemColumns.ID_,
+                "count(_id)",
+                "max(coalesce(${MediaItemColumns.DATE_MODIFIED}, ${MediaItemColumns.DATE_ADDED}))"
+            )
+
+            val selection = StringBuilder("${GalleryAppFeatures.SAMSUNG_FAVORITE} = 1").apply {
+                if (GalleryAppFeatures.USE_SEC_MEDIA_URI && !GalleryAppFeatures.isSupportCloudOnlySync()) {
+                    append(" AND is_cloud != 2")
+                }
+            }
+
+            mResolver.query(uri, projection, selection.toString(), null, null)?.use { cursor ->
+                val indices = getColumnIndices(cursor)
+                with(cursor) {
+                    while (moveToNext()) {
+                        val count = getInt(indices.countIndex)
+                        if (count <= 0) continue
+                        val id = constructId(GalleryAppFeatures.FAVORITE_IMAGE_BUCKET_ID)
+                        val data = AlbumData(
+                            id = id,
+                            thumbnailUrl = getString(indices.dataIndex),
+                            title = "Favourites",
+                            thumbnailId = getLong(indices.dateTakenIndex),
+                            count = count
+                        )
+                        tempAlbums[id] = data
+                        Log.i(TAG, "favorite album count: $count")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun sortAlbumsGraceOrder(
+        foundAlbums: LinkedHashMap<String, AlbumData>,
+        tempAlbums: LinkedHashMap<String, AlbumData>
+    ) {
+        if (GalleryAppFeatures.isSamsungDevice()) {
+            val sortOrder = arrayOf(
+                constructId(GalleryAppFeatures.FAVORITE_IMAGE_BUCKET_ID),
+                constructId(GalleryAppFeatures.CAMERA_IMAGE_BUCKET_ID),
+                constructId(GalleryAppFeatures.getSdCardCameraBucketId()),
+                constructId(GalleryAppFeatures.COVER_CAMERA_IMAGE_BUCKET_ID),
+                constructId(GalleryAppFeatures.getSdCardCoverCameraBucketId(mContext)),
+                constructId(GalleryAppFeatures.GEAR_IMAGE_BUCKET_ID),
+                constructId(GalleryAppFeatures.SCREENSHOT_IMAGE_BUCKET_ID),
+                constructId(GalleryAppFeatures.DOWNLOAD_IMAGE_BUCKET_ID),
+                constructId(GalleryAppFeatures.ANIMATED_IMAGE_BUCKET_ID),
+                constructId(GalleryAppFeatures.COLLAGE_IMAGE_BUCKET_ID)
+            )
+
+            for (id in sortOrder) {
+                tempAlbums.remove(id)?.let { foundAlbums[id] = it }
+            }
+        }
+        foundAlbums.putAll(tempAlbums)
+    }
+
+    private data class ColumnIndices(
+        val dataIndex: Int,
+        val bucketIdIndex: Int,
+        val nameIndex: Int,
+        val dateTakenIndex: Int,
+        val idIndex: Int,
+        val countIndex: Int
+    )
+
+    private fun getColumnIndices(cursor: Cursor) = ColumnIndices(
+        dataIndex = cursor.getColumnIndex(MediaItemColumns.DATA_),
+        bucketIdIndex = cursor.getColumnIndex(MediaItemColumns.BUCKET_ID),
+        nameIndex = cursor.getColumnIndex(MediaItemColumns.BUCKET_DISPLAY_NAME),
+        dateTakenIndex = cursor.getColumnIndex(MediaItemColumns.DATE_TAKEN),
+        idIndex = cursor.getColumnIndex(MediaItemColumns.ID_),
+        countIndex = cursor.getColumnIndex("count(_id)")
+    )
+
+    data class AlbumData(
+        var id: String? = null,
+        var title: String? = null,
+        var thumbnailUrl: String? = null,
+        var thumbnailId: Long = 0,
+        var updated: Long = 0,
+        var count: Int = 0,
+        var isShared: Boolean = false,
+        var isSharedAlbumOwner: Boolean = false,
+        var isFamilyAlbum: Boolean = false
+    )
+
+    companion object {
+        private const val TAG = "GalleryLocalAlbum"
+        private const val BUCKET_ID_PREFIX = "GalleryLocalAlbum"
+        fun constructId(bucketId: String): String = "$BUCKET_ID_PREFIX:$bucketId"
+    }
+}
+
