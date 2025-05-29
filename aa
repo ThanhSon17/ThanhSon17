@@ -1,392 +1,254 @@
-private val messageListener = MessageClient.OnMessageReceivedListener { messageEvent ->
-        if (messageEvent.path == "/test-path") {
-            val message = String(messageEvent.data)
-            Log.d("Watch", "Message received: $message")
-        } else {
-            Log.d("Watch", "Message received on unknown path: ${messageEvent.path}")
-        }
-    }
+import android.content.Context
+import android.graphics.Canvas
+import androidx.recyclerview.widget.RecyclerView
+import android.view.View
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_wear)
-        Log.d("Watch", "Activity created")
-    }
+// Giả sử ViewHolderValue và các R.dimen của bạn được định nghĩa ở nơi khác
+// Ví dụ: object ViewHolderValue { const val VIEW_HOLDER_TYPE_DATA = 0 /* Hoặc giá trị thực tế */ }
 
-    override fun onResume() {
-        super.onResume()
-        Wearable.getMessageClient(this).addListener(messageListener)
-        Log.d("Watch", "MessageClient listener added")
-    }
-
-    override fun onPause() {
-        super.onPause()
-        Wearable.getMessageClient(this).removeListener(messageListener)
-        Log.d("Watch", "MessageClient listener removed")
-    }
-<androidx.wear.widget.BoxInsetLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
-
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="8dp"
-        app:layout_boxedEdges="all">
-
-        <ImageView
-            android:id="@+id/imageView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone"
-            android:scaleType="centerCrop"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <ProgressBar
-            android:id="@+id/progressBar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:visibility="gone"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <TextView
-            android:id="@+id/errorText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:visibility="gone"
-            android:textAlignment="center"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
-</androidx.wear.widget.BoxInsetLayout>
-
-view?.showTransferProgress() // Show loading state while checking
-            try {
-                // Get capabilities to ensure the device can receive images
-                val capabilityInfo = Tasks.await(
-                    Wearable.getCapabilityClient(context)
-                        .getCapability("receive_images", CapabilityClient.FILTER_REACHABLE)
-                )
-                
-                if (capabilityInfo.nodes.isNotEmpty()) {
-                    // We found a wear device that can receive images
-                    view?.showImageSelectionUI()
-                } else {
-                    // Double check connected nodes in case capability isn't registered
-                    val nodes = Tasks.await(Wearable.getNodeClient(context).connectedNodes)
-                    if (nodes.isNotEmpty()) {
-                        view?.showImageSelectionUI()
-                    } else {
-                        view?.showNoConnectedDevicesError()
-                    }
-                }
-
-
-binding = ActivityImageReceiverBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        
-        capabilityClient = Wearable.getCapabilityClient(this)
-        
-        // Advertise that this device can receive images
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                Tasks.await(capabilityClient.addLocalCapability("receive_images"))
-            } catch (e: Exception) {
-                Log.e("ImageReceiver", "Failed to advertise capability", e)
-            }
-        }
-        
-        presenter = ImageReceiverPresenter(
-            this,
-            Wearable.getDataClient(this)
-        )
-        presenter.onAttach(this)
-        presenter.startListeningForImages()
-    }
-    
-    override fun onDestroy() {
-        // Remove capability when activity is destroyed
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                Tasks.await(capabilityClient.removeLocalCapability("receive_images"))
-            } catch (e: Exception) {
-                Log.e("ImageReceiver", "Failed to remove capability", e)
-            }
-        }
-        presenter.onDetach()
-        super.onDestroy()
-    }
-
-
-override fun checkWearDeviceConnection() {
-        // Initialize on main thread
-        val nodeClient = Wearable.getNodeClient(context)
-        
-        scope.launch {
-            view?.showTransferProgress()
-            try {
-                // Switch to IO dispatcher for the async operation
-                val nodes = withContext(Dispatchers.IO) {
-                    Tasks.await(nodeClient.connectedNodes)
-                }
-                
-                // Back on main thread
-                if (nodes.isNotEmpty()) {
-                    Log.d("ImageTransfer", "Found connected nodes: ${nodes.map { it.displayName }}")
-                    view?.showImageSelectionUI()
-                } else {
-                    Log.d("ImageTransfer", "No connected nodes found")
-                    view?.showNoConnectedDevicesError()
-                }
-            } catch (e: Exception) {
-                Log.e("ImageTransfer", "Connection check failed", e)
-                view?.showTransferError("Failed to check Wear device connection: ${e.message}")
-            }
-        }
-    }
-
-try {
-                // Read image data in IO context
-                val imageData = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { 
-                        it.readBytes() 
-                    } ?: throw IllegalStateException("Failed to read image data")
-                }
-                
-                // Create request on main thread
-                val request = PutDataMapRequest.create("/image_transfer").apply {
-                    dataMap.putAsset("image", Asset.createFromBytes(imageData))
-                    dataMap.putLong("timestamp", System.currentTimeMillis())
-                }.asPutDataRequest()
-                    .setUrgent()
-                
-                // Execute data transfer in IO context
-                withContext(Dispatchers.IO) {
-                    Tasks.await(dataClient.putDataItem(request))
-                }
-                
-                // Update UI on main thread
-                view?.showTransferSuccess()
-                Log.d("ImageTransfer", "Image transfer successful")
-                
-            } catch (e: Exception) {
-                Log.e("ImageTransfer", "Image transfer failed", e)
-                view?.showTransferError("Failed to transfer image: ${e.message}")
-            }
-        }
-
-
-// Wear OS - ImageReceiverPresenter.kt
-class ImageReceiverPresenter(
+class PicturesAdapterTransitionItemDecoration(
     private val context: Context,
-    private val dataClient: DataClient
-) : ImageReceiverContract.Presenter {
-    
-    private var view: ImageReceiverContract.View? = null
-    private val scope = CoroutineScope(Dispatchers.Main + Job())
-    private var dataListener: DataClient.OnDataChangedListener? = null
-    
-    override fun onAttach(view: ImageReceiverContract.View) {
-        this.view = view
-        Log.d("WearImageReceiver", "Presenter attached to view")
+    private var isShowTop: Boolean, // Trạng thái ban đầu của mIsShowTop
+    private val adapter: PicturesAdapter<*> // Tham chiếu đến adapter để kiểm tra viewType
+) : RecyclerView.ItemDecoration() {
+
+    private val translationType0: Float // Cho pos % 3 == 0
+    private val translationType1: Float // Cho pos % 3 == 1
+    private val translationType2: Float // Cho pos % 3 == 2
+
+    init {
+        // Lấy giá trị pixel từ resources
+        val picturesRecyclerViewEndPadding = context.resources.getDimensionPixelSize(R.dimen.pictures_recycler_view_end_padding).toFloat()
+        val pictureItemThumbnailBorder = context.resources.getDimensionPixelSize(R.dimen.pictures_item_thumbnail_border).toFloat() // Giả sử đây là R.dimen đúng
+        val topTabIconMarginLeftRight = context.resources.getDimensionPixelSize(R.dimen.top_tab_icon_margin_left_right).toFloat()
+
+        // Tính toán các giá trị dịch chuyển dựa trên logic gốc của bạn
+        // pos % 3 == 0
+        translationType0 = picturesRecyclerViewEndPadding + pictureItemThumbnailBorder
+
+        // pos % 3 == 1 (Logic gốc của bạn là: R.dimen.top_tab_icon_margin_left_right - R.dimen.pictures_item_thumbnail_border)
+        translationType1 = topTabIconMarginLeftRight - pictureItemThumbnailBorder
+
+        // pos % 3 == 2 (Logic gốc của bạn là: -(R.dimen.top_tab_icon_margin_left_right + R.dimen.pictures_item_thumbnail_border * 2))
+        translationType2 = -(topTabIconMarginLeftRight + pictureItemThumbnailBorder * 2)
     }
-    
-    override fun onDetach() {
-        dataListener?.let { dataClient.removeListener(it) }
-        scope.cancel()
-        view = null
-        Log.d("WearImageReceiver", "Presenter detached from view")
-    }
-    
-    override fun startListeningForImages() {
-        Log.d("WearImageReceiver", "Starting to listen for images")
-        
-        // First try to get any existing data
-        scope.launch {
-            try {
-                val dataItems = Tasks.await(dataClient.getDataItems(
-                    Uri.Builder()
-                        .scheme(PutDataRequest.WEAR_URI_SCHEME)
-                        .path("/image_transfer")
-                        .build()
-                ))
-                
-                dataItems.forEach { dataItem ->
-                    Log.d("WearImageReceiver", "Found existing data item")
-                    processImageDataItem(dataItem)
-                }
-            } catch (e: Exception) {
-                Log.e("WearImageReceiver", "Error getting existing data items", e)
-            }
+
+    // Hàm này được gọi từ Activity/Fragment khi trạng thái isShowTop thay đổi
+    fun updateIsShowTop(newIsShowTop: Boolean) {
+        if (this.isShowTop != newIsShowTop) {
+            this.isShowTop = newIsShowTop
+            // Yêu cầu RecyclerView vẽ lại các item decoration
+            // (Việc gọi invalidateItemDecorations() sẽ được thực hiện từ Activity/Fragment)
         }
-        
-        // Then listen for new data
-        dataListener = DataClient.OnDataChangedListener { dataEvents ->
-            Log.d("WearImageReceiver", "Received data change event")
-            for (event in dataEvents) {
-                Log.d("WearImageReceiver", "Processing event: ${event.type} with path: ${event.dataItem.uri.path}")
-                if (event.dataItem.uri.path == "/image_transfer") {
-                    processImageDataItem(event.dataItem)
-                }
-            }
-        }
-        
-        dataClient.addListener(dataListener!!)
-            .addOnSuccessListener { 
-                Log.d("WearImageReceiver", "Successfully added data listener") 
-            }
-            .addOnFailureListener { e ->
-                Log.e("WearImageReceiver", "Failed to add data listener", e)
-            }
     }
-    
-    private fun processImageDataItem(dataItem: DataItem) {
-        Log.d("WearImageReceiver", "Processing image data item")
-        scope.launch(Dispatchers.Main) {
-            view?.showLoadingState()
-            try {
-                val dataMap = DataMapItem.fromDataItem(dataItem).dataMap
-                val asset = dataMap.getAsset("image") 
-                    ?: throw IllegalStateException("No image asset found")
-                
-                Log.d("WearImageReceiver", "Getting asset FD")
-                
-                // Get the asset on IO thread
-                val imageData = withContext(Dispatchers.IO) {
-                    Tasks.await(dataClient.getFdForAsset(asset))
-                        ?.inputStream
-                        ?.use { it.readBytes() }
-                        ?: throw IllegalStateException("Failed to read image data")
+
+    private fun getRealPosition(viewPosition: Int): Int {
+        // Kiểm tra xem vị trí có hợp lệ không trước khi trừ
+        if (viewPosition < 0) return viewPosition
+        return if (isShowTop && viewPosition > 0) viewPosition - 1 else viewPosition
+    }
+
+    override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State) {
+        super.onDraw(c, parent, state)
+
+        for (i in 0 until parent.childCount) {
+            val childView: View = parent.getChildAt(i)
+            val adapterPosition: Int = parent.getChildAdapterPosition(childView)
+
+            if (adapterPosition == RecyclerView.NO_POSITION) {
+                continue
+            }
+
+            // Chỉ áp dụng dịch chuyển cho các mục dữ liệu hình ảnh
+            // Sử dụng adapter được truyền vào để lấy viewType
+            val viewType = adapter.getItemViewType(adapterPosition)
+            if (viewType == ViewHolderValue.VIEW_HOLDER_TYPE_DATA) { // Sử dụng hằng số viewType của bạn
+                val realPos = getRealPosition(adapterPosition)
+
+                if (realPos < 0) { // Nếu realPos không hợp lệ (ví dụ: header khi isShowTop=true và adapterPosition=0)
+                    childView.translationX = 0f
+                    continue
                 }
-                
-                Log.d("WearImageReceiver", "Decoding bitmap")
-                
-                // Decode bitmap on IO thread
-                val bitmap = withContext(Dispatchers.IO) {
-                    BitmapFactory.decodeByteArray(imageData, 0, imageData.size)
+
+                when (realPos % 3) {
+                    0 -> childView.translationX = translationType0
+                    1 -> childView.translationX = translationType1
+                    2 -> childView.translationX = translationType2
+                    else -> childView.translationX = 0f // Luôn đặt lại cho các trường hợp khác
                 }
-                
-                Log.d("WearImageReceiver", "Showing image")
-                view?.showImage(bitmap)
-                
-            } catch (e: Exception) {
-                Log.e("WearImageReceiver", "Failed to process image", e)
-                view?.showError("Failed to process image: ${e.message}")
+            } else {
+                // Đặt lại translationX cho các loại view khác để tránh lỗi khi tái sử dụng
+                childView.translationX = 0f
             }
         }
     }
 }
 
-// Wear OS - ImageReceiverActivity.kt
-class ImageReceiverActivity : ComponentActivity(), ImageReceiverContract.View {
-    
-    private lateinit var presenter: ImageReceiverContract.Presenter
-    private lateinit var binding: ActivityImageReceiverBinding
-    
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        Log.d("WearImageReceiver", "Activity onCreate")
-        
-        binding = ActivityImageReceiverBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        
-        presenter = ImageReceiverPresenter(
-            this,
-            Wearable.getDataClient(this)
-        )
-        
-        presenter.onAttach(this)
-        presenter.startListeningForImages()
+
+
+
+
+import android.annotation.SuppressLint
+import android.content.Context // Cần import nếu chưa có
+import android.util.Log // Cần import nếu chưa có
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import androidx.recyclerview.widget.RecyclerView // Cần import nếu chưa có
+
+// Giả sử các lớp và hằng số này đã được định nghĩa:
+// interface IPicturesView { /* ... */ fun supportLayoutCache(): Boolean }
+// class BaseListViewAdapter<V>(view: V, locationKey: String) : RecyclerView.Adapter<ListViewHolder>() { /* ... */
+//    open var mIsShowTop: Boolean = false // Thêm khai báo này nếu nó chưa có trong BaseListViewAdapter
+//    open fun getItemViewType(position: Int): Int { /* ... */ return ViewHolderValue.VIEW_HOLDER_TYPE_DATA } // Ví dụ
+//    open fun resetSharedTransitionView(isDone: Boolean) {}
+//    open fun sesLwIsResizeEnabled(position: Int): Boolean { return true }
+// }
+// open class ListViewHolder(itemView: View, val viewType: Int = ViewHolderValue.VIEW_HOLDER_TYPE_DATA) : RecyclerView.ViewHolder(itemView) {
+//    companion object {
+//        const val TYPE_BOTTOM_ADD = 1
+//        const val TYPE_TOP_TAB = 2
+//        const val TYPE_ALBUM_TITLE = 3
+//    }
+// }
+// class ImageViewHolder(itemView: View, viewType: Int) : ListViewHolder(itemView, viewType) {
+//    var mImageView: View? = null // Hoặc kiểu cụ thể hơn như ImageView
+//    fun prepareSharedTransition(view: IPicturesView) {}
+// }
+// object ViewHolderValue { const val VIEW_HOLDER_TYPE_DATA = 0 /* Hoặc giá trị thực tế */ }
+// object StaticFeatures {
+//    var THUMBNAIL_CIRCLE_BITMAP = false
+//    var SUPPORT_LAYOUT_CACHE = false
+// }
+// object LayoutCache { fun getCachedViewHolder(id: Int): View? = null }
+// object AppResources { // Thay thế bằng cách truy cập resources thực tế của bạn
+//    fun getDimenResToPx(id: Int): Int = 0 // Dummy implementation
+// }
+// object R { // Dummy R class
+//    object layout {
+//        const val recycler_item_pictures_round_image_layout = 1
+//        const val recycler_item_pictures_image_layout = 2
+//        const val recycler_item_bottom_add_layout = 3
+//    }
+//    object dimen { // Các giá trị này sẽ được sử dụng bởi ItemDecoration
+//        const val pictures_recycler_view_end_padding = 1
+//        const val picture_item_thumbnail_border = 2 // Có thể là pictures_item_thumbnail_border
+//        const val pictures_item_thumbnail_border = 2 // Giả sử đây là đúng
+//        const val top_tab_icon_margin_left_right = 3
+//    }
+//    object drawable {
+//        const val picture_view_thumbnail_border = 1
+//    }
+// }
+
+
+open class PicturesAdapter<V : IPicturesView>(
+    val view: V, // mView được sử dụng, nên để là val và public hoặc internal
+    locationKey: String
+) : BaseListViewAdapter<V>(view, locationKey) {
+
+    private val itemLayoutId =
+        if (StaticFeatures.THUMBNAIL_CIRCLE_BITMAP) R.layout.recycler_item_pictures_round_image_layout else R.layout.recycler_item_pictures_image_layout
+    // private val itemBottomAddLayoutId = R.layout.recycler_item_bottom_add_layout // Không thấy sử dụng, có thể bỏ
+    override var mIsFirstLaunch: Boolean = false
+
+    // Thêm context nếu BaseListViewAdapter không cung cấp
+    // protected val context: Context = view.getContext() // Nếu IPicturesView có getContext()
+
+    companion object { // Thêm TAG nếu chưa có
+        private const val TAG = "PicturesAdapter"
     }
-    
-    override fun onDestroy() {
-        presenter.onDetach()
-        super.onDestroy()
+
+    @SuppressLint("ResourceType")
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ListViewHolder {
+        var itemView: View? = null // Đổi tên biến để tránh trùng tên với thuộc tính của class
+        return if (viewType != ListViewHolder.TYPE_BOTTOM_ADD && viewType != ListViewHolder.TYPE_TOP_TAB && viewType != ListViewHolder.TYPE_ALBUM_TITLE) {
+            if (StaticFeatures.SUPPORT_LAYOUT_CACHE && this.view.supportLayoutCache()) { // Sử dụng this.view
+                itemView = LayoutCache.getCachedViewHolder(itemLayoutId)
+            }
+            if (itemView == null) {
+                itemView = LayoutInflater.from(parent.context).inflate(itemLayoutId, parent, false)
+            }
+            ImageViewHolder(itemView!!, ViewHolderValue.VIEW_HOLDER_TYPE_DATA) // itemView chắc chắn không null ở đây
+        } else {
+            super.onCreateViewHolder(parent, viewType)
+        }
     }
-    
-    override fun showLoadingState() {
-        Log.d("WearImageReceiver", "Showing loading state")
-        binding.progressBar.isVisible = true
-        binding.imageView.isVisible = false
-        binding.errorText.isVisible = false
+
+    // SET - Shared Element Transition
+    private var needSET = true
+    private var positionSET = -1
+    private var listViewReady = true
+
+    override fun onBindViewHolder(viewHolder: ListViewHolder, viewPosition: Int) {
+        super.onBindViewHolder(viewHolder, viewPosition)
+        // KHÔNG CÒN GỌI transitionImage(viewHolder, viewPosition) ở đây nữa
+        // ItemDecoration sẽ xử lý việc này
+
+        if (viewHolder is ImageViewHolder) {
+            if (needSET && positionSET == viewPosition && listViewReady) {
+                needSET = false
+                viewHolder.prepareSharedTransition(this.view) // Sử dụng this.view
+            }
+        }
     }
-    
-    override fun showImage(bitmap: Bitmap) {
-        Log.d("WearImageReceiver", "Showing image")
-        binding.progressBar.isVisible = false
-        binding.imageView.isVisible = true
-        binding.errorText.isVisible = false
-        binding.imageView.setImageBitmap(bitmap)
+
+    fun prepareSharedTransition(position: Int) {
+        Log.d(TAG, "Transition: set position transition = $position")
+        positionSET = position
+        needSET = true
     }
-    
-    override fun showError(message: String) {
-        Log.d("WearImageReceiver", "Showing error: $message")
-        binding.progressBar.isVisible = false
-        binding.imageView.isVisible = false
-        binding.errorText.isVisible = true
-        binding.errorText.text = message
+
+    fun checkPrePareViewHolder(position: Int) {
+        if (needSET) {
+            notifyItemChanged(position, false) // Payload có thể là bất kỳ object nào, không nhất thiết boolean
+        }
     }
+
+    fun onListViewReady(ready: Boolean) {
+        Log.d(TAG, "onListViewReady#$ready")
+        listViewReady = ready
+    }
+
+    override fun resetSharedTransitionView(isDone: Boolean) {
+        super.resetSharedTransitionView(isDone)
+        if (isDone) {
+            // Giả sử mGalleryListView là RecyclerView của bạn và có thể truy cập được
+            // val viewHolder = mGalleryListView?.findViewHolderForAdapterPosition(positionSET)
+            // if (viewHolder is ImageViewHolder) {
+            // viewHolder.mImageView?.foreground = context?.getDrawable(R.drawable.picture_view_thumbnail_border) // Cần context
+            // }
+        }
+    }
+
+    // XÓA PHƯƠNG THỨC transitionImage
+    // private fun transitionImage(viewHolder: ListViewHolder, viewPosition: Int) { ... }
+
+    // XÓA PHƯƠNG THỨC getRealPosition (logic này đã chuyển vào ItemDecoration)
+    // open fun getRealPosition(viewPosition: Int): Int { ... }
+
+
+    // Phương thức này cần được định nghĩa trong BaseListViewAdapter hoặc ở đây nếu chưa có
+    // override var mIsShowTop: Boolean
+    //    get() = super.mIsShowTop // Hoặc logic riêng
+    //    set(value) { super.mIsShowTop = value }
+
+
+    override fun sesLwIsResizeEnabled(position: Int): Boolean {
+        if (getItemViewType(position) == ListViewHolder.TYPE_ALBUM_TITLE) {
+            return false
+        }
+        return super.sesLwIsResizeEnabled(position)
+    }
+
+    // Cần đảm bảo mIsShowTop được cập nhật đúng cách trong adapter này
+    // hoặc trong BaseListViewAdapter để ItemDecoration có thể lấy trạng thái chính xác.
+    // Ví dụ, nếu BaseListViewAdapter có hàm setHeaderVisibility(boolean visible):
+    // public void setHeaderVisibility(boolean visible) {
+    //     boolean oldIsShowTop = mIsShowTop;
+    //     mIsShowTop = visible;
+    //     if (oldIsShowTop != mIsShowTop) {
+    //         // Thông báo cho ItemDecoration cập nhật (thông qua Activity/Fragment)
+    //     }
+    // }
 }
-
-Wearable.getCapabilityClient(context)
-    .getCapability("wearos_capability", CapabilityClient.FILTER_REACHABLE)
-    .addOnSuccessListener { capabilityInfo ->
-        if (capabilityInfo.nodes.isNotEmpty()) {
-            Log.d("WearImageReceiver", "Wear OS device connected")
-        } else {
-            Log.e("WearImageReceiver", "No connected Wear OS device")
-        }
-    }
-    .addOnFailureListener { e ->
-        Log.e("WearImageReceiver", "Failed to check capability", e)
-    }
-
-Wearable.getNodeClient(context)
-    .connectedNodes
-    .addOnSuccessListener { nodes ->
-        if (nodes.isNotEmpty()) {
-            Log.d("Phone", "Wear OS devices connected: ${nodes.map { it.displayName }}")
-        } else {
-            Log.e("Phone", "No Wear OS devices connected")
-        }
-    }
-    .addOnFailureListener { e ->
-        Log.e("Phone", "Failed to retrieve connected nodes", e)
-    }
-
-
-Wearable.getCapabilityClient(context)
-    .addLocalCapability("image_transfer_capability")
-    .addOnSuccessListener {
-        Log.d("Wear", "Capability added successfully")
-    }
-    .addOnFailureListener { e ->
-        Log.e("Wear", "Failed to add capability", e)
-    }
-Trên điện thoại (Tìm kiếm capability):
-kotlin
-Copy code
-Wearable.getCapabilityClient(context)
-    .getCapability("image_transfer_capability", CapabilityClient.FILTER_REACHABLE)
-    .addOnSuccessListener { capabilityInfo ->
-        if (capabilityInfo.nodes.isNotEmpty()) {
-            Log.d("Phone", "Connected Wear OS devices: ${capabilityInfo.nodes.map { it.displayName }}")
-        } else {
-            Log.e("Phone", "No reachable Wear OS devices with this capability")
-        }
-    }
-    .addOnFailureListener { e ->
-        Log.e("Phone", "Failed to retrieve capability info", e)
-    }
